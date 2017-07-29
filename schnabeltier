@@ -116,6 +116,8 @@ testindizes = sample(1:nrow(daten), floor(nrow(daten)/3))
 trainingset = daten[-testindizes,]
 testset = daten[testindizes,]
 
+trainingset2 = daten2[-testindizes,]
+testset2 = daten2[testindizes,]
 
 
 # kNN
@@ -130,9 +132,9 @@ knntab = table(knnpred, true = testset$lbls)
 nnlblstraining = as.numeric(as.character(trainingset$lbls) == "Schnabeltier")
 nnlblstest = as.numeric(as.character(testset$lbls) == "Schnabeltier")
 
-form = as.formula(paste("nnlblstraining ~", paste(names(trainingset)[-ncol(trainingset)], collapse = " + ")))
-nn = neuralnet(form, data=trainingset[,-ncol(trainingset)], hidden=c(150, 50), linear.output = FALSE)
-pred = compute(nn, testset[,-ncol(testset)])$net.result
+form = as.formula(paste("nnlblstraining ~", paste(names(trainingset2)[-ncol(trainingset2)], collapse = " + ")))
+nn = neuralnet(form, data=trainingset2[,-ncol(trainingset2)], hidden=c(150, 50), linear.output = FALSE)
+pred = compute(nn, testset2[,-ncol(testset2)])$net.result
 
 
 
