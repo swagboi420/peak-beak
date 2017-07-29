@@ -1,6 +1,7 @@
 library(EBImage)
 library(e1071)
-library(ggplot2)
+library(class)
+library(neuralnet)
 
 schnabelpfad = "C:/Users/Marius/Pictures/Schnabeltiere/"
 andererpfad = "C:/Users/Marius/Pictures/Nicht-Schnabeltiere/"
@@ -21,10 +22,12 @@ for(d in anderedateien){
 
 bilder = c(schnabelbilder, anderebilder)
 
+
+# Erstellen der Merkmalsvektoren im R^303
+
 rot = t(data.frame(rep(0, 101)))
 gruen = t(data.frame(rep(0, 101)))
 blau = t(data.frame(rep(0, 101)))
-
 
 liste = list(rot, gruen, blau)
 
@@ -46,34 +49,50 @@ for(i in 1:length(bilder)){
     frame = frame/rowSums(frame)
     liste[[j]] = rbind(liste[[j]], frame)
   }
-  
-  # tab = table(c(imageData(bilder[[i]])))
-  # max1 = as.numeric(names(tab[order(-tab)])[1])
-  # max2 = as.numeric(names(tab[order(-tab)])[2])
-  # helligkeit = rbind(helligkeit, c(max1, max2))
-  # 
-  # hst = hist(bilder[[i]])
-  # 
-  # cat("rot", sep = " ")
-  # rmax1 = hst$red$mids[order(-hst$red$counts)][1]
-  # rmax2 = hst$red$mids[order(-hst$red$counts)][2]
-  # rmean = sum(hst$red$mids*hst$red$counts)/sum(hst$red$counts)
-  # 
-  # cat("grün", sep = " ")
-  # gmax1 = hst$green$mids[order(-hst$green$counts)][1]
-  # gmax2 = hst$green$mids[order(-hst$green$counts)][2]
-  # gmean = sum(hst$green$mids*hst$green$counts)/sum(hst$green$counts)
-  # 
-  # cat("blau", sep="\n")
-  # bmax1 = hst$blue$mids[order(-hst$blue$counts)][1]
-  # bmax2 = hst$blue$mids[order(-hst$blue$counts)][2]
-  # bmean = sum(hst$blue$mids*hst$blue$counts)/sum(hst$blue$counts)
-  # 
-  # rot = rbind(rot, c(rmax1, rmax2, rmean))
-  # gruen = rbind(gruen, c(gmax1, gmax2, gmean))
-  # blau = rbind(blau, c(bmax1, bmax2, bmean))
 }
 
+
+# Alternative Merkmalsvektoren im R^11
+
+helligkeit = data.frame(c(0), c(0))
+rot2 = data.frame(c(0), c(0), c(0))
+gruen2 = data.frame(c(0), c(0), c(0))
+blau2 = data.frame(c(0), c(0), c(0))
+
+for(i in 1:length(bilder)){
+  tab = table(c(imageData(bilder[[i]])))
+  max1 = as.numeric(names(tab[order(-tab)])[1])
+  max2 = as.numeric(names(tab[order(-tab)])[2])
+  helligkeit = rbind(helligkeit, c(max1, max2))
+
+  hst = hist(bilder[[i]])
+
+  cat("rot", sep = " ")
+  rmax1 = hst$red$mids[order(-hst$red$counts)][1]
+  rmax2 = hst$red$mids[order(-hst$red$counts)][2]
+  rmean = sum(hst$red$mids*hst$red$counts)/sum(hst$red$counts)
+
+  cat("grün", sep = " ")
+  gmax1 = hst$green$mids[order(-hst$green$counts)][1]
+  gmax2 = hst$green$mids[order(-hst$green$counts)][2]
+  gmean = sum(hst$green$mids*hst$green$counts)/sum(hst$green$counts)
+
+  cat("blau", sep="\n")
+  bmax1 = hst$blue$mids[order(-hst$blue$counts)][1]
+  bmax2 = hst$blue$mids[order(-hst$blue$counts)][2]
+  bmean = sum(hst$blue$mids*hst$blue$counts)/sum(hst$blue$counts)
+
+  rot2 = rbind(rot, c(rmax1, rmax2, rmean))
+  gruen2 = rbind(gruen, c(gmax1, gmax2, gmean))
+  blau2 = rbind(blau, c(bmax1, bmax2, bmean))
+}
+
+helligkeit = helligkeit[-1,]
+rot2 = rot2[-1,]
+gruen2 = gruen2[-1,]
+blau2 = blau2[-1,]
+
+daten2 = cbind(helligkeit, rot2, gruen2, blau2)
 
 rot = liste[[1]][-1,]
 colnames(rot) = paste0("r", colnames(rot))
@@ -87,10 +106,37 @@ row.names(daten) = 1:nrow(daten)
 
 lbls = factor(c(rep("Schnabeltier", length(schnabelbilder)), rep("Andere", length(anderebilder))))
 daten = cbind(daten, lbls)
+daten2 = cbind(daten2, lbls)
+
+
+
+# Samplen von Trainings- und Validierungsmenge
 
 testindizes = sample(1:nrow(daten), floor(nrow(daten)/3))
 trainingset = daten[-testindizes,]
 testset = daten[testindizes,]
+
+
+
+# kNN
+
+knnpred = knn(trainingset[,-ncol(trainingset)], testset[,-ncol(testset)], k=3, cl=trainingset$lbls)
+knntab = table(knnpred, true = testset$lbls)
+
+
+
+# Neural Network
+
+nnlblstraining = as.numeric(as.character(trainingset$lbls) == "Schnabeltier")
+nnlblstest = as.numeric(as.character(testset$lbls) == "Schnabeltier")
+
+form = as.formula(paste("nnlblstraining ~", paste(names(trainingset)[-ncol(trainingset)], collapse = " + ")))
+nn = neuralnet(form, data=trainingset[,-ncol(trainingset)], hidden=c(150, 50), linear.output = FALSE)
+pred = compute(nn, testset[,-ncol(testset)])$net.result
+
+
+
+# SVM
 
 tuned = tune.svm(lbls~., data=trainingset, gamma=10^(-5:-1), cost=10^(0:5))
 model = tuned$best.model
