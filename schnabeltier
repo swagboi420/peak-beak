@@ -60,6 +60,7 @@ gruen2 = data.frame(c(0), c(0), c(0))
 blau2 = data.frame(c(0), c(0), c(0))
 
 for(i in 1:length(bilder)){
+  cat(paste("\n", i))
   tab = table(c(imageData(bilder[[i]])))
   max1 = as.numeric(names(tab[order(-tab)])[1])
   max2 = as.numeric(names(tab[order(-tab)])[2])
@@ -82,9 +83,9 @@ for(i in 1:length(bilder)){
   bmax2 = hst$blue$mids[order(-hst$blue$counts)][2]
   bmean = sum(hst$blue$mids*hst$blue$counts)/sum(hst$blue$counts)
 
-  rot2 = rbind(rot, c(rmax1, rmax2, rmean))
-  gruen2 = rbind(gruen, c(gmax1, gmax2, gmean))
-  blau2 = rbind(blau, c(bmax1, bmax2, bmean))
+  rot2 = rbind(rot2, c(rmax1, rmax2, rmean))
+  gruen2 = rbind(gruen2, c(gmax1, gmax2, gmean))
+  blau2 = rbind(blau2, c(bmax1, bmax2, bmean))
 }
 
 helligkeit = helligkeit[-1,]
@@ -93,6 +94,7 @@ gruen2 = gruen2[-1,]
 blau2 = blau2[-1,]
 
 daten2 = cbind(helligkeit, rot2, gruen2, blau2)
+names(daten2) = paste0("var",1:ncol(daten2))
 
 rot = liste[[1]][-1,]
 colnames(rot) = paste0("r", colnames(rot))
@@ -125,6 +127,9 @@ testset2 = daten2[testindizes,]
 knnpred = knn(trainingset[,-ncol(trainingset)], testset[,-ncol(testset)], k=3, cl=trainingset$lbls)
 knntab = table(knnpred, true = testset$lbls)
 
+knnpred2 = knn(trainingset2[,-ncol(trainingset2)], testset2[,-ncol(testset2)], k=3, cl=trainingset2$lbls)
+knntab2 = table(knnpred2, true=testset2$lbls)
+
 
 
 # Neural Network
@@ -133,9 +138,11 @@ nnlblstraining = as.numeric(as.character(trainingset$lbls) == "Schnabeltier")
 nnlblstest = as.numeric(as.character(testset$lbls) == "Schnabeltier")
 
 form = as.formula(paste("nnlblstraining ~", paste(names(trainingset2)[-ncol(trainingset2)], collapse = " + ")))
-nn = neuralnet(form, data=trainingset2[,-ncol(trainingset2)], hidden=c(150, 50), linear.output = FALSE)
-pred = compute(nn, testset2[,-ncol(testset2)])$net.result
-
+nn = neuralnet(form, data=trainingset2[,-ncol(trainingset2)], hidden=c(7,3), linear.output = FALSE, stepmax=10^6)
+pred = round(compute(nn, testset2[,-ncol(testset2)])$net.result)
+pred[pred == 1] = "Schnabeltier"
+pred[pred == 0] = "Andere"
+nntab = table(pred, true = testset$lbls)
 
 
 # SVM
@@ -144,4 +151,8 @@ tuned = tune.svm(lbls~., data=trainingset, gamma=10^(-5:-1), cost=10^(0:5))
 model = tuned$best.model
 prediction = predict(model, testset[,-ncol(testset)])
 tab = table(pred = prediction, true = testset[,ncol(testset)])
-tab
+
+tuned2 = tune.svm(lbls~., data=trainingset2, gamma=10^(-5:-1), cost=10^(0:5))
+model2 = tuned2$best.model
+prediction2 = predict(model2, testset2[,-ncol(testset2)])
+tab2 = table(pred = prediction2, true = testset2[,ncol(testset2)])
